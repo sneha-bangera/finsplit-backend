@@ -1,0 +1,21 @@
+package com.finsplit.finsplit.security;
+
+import com.finsplit.finsplit.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.userdetails.*;
+        import org.springframework.stereotype.Service;
+import java.util.Collections;
+
+@Service
+@RequiredArgsConstructor
+public class UserDetailsServiceImpl implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        var user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+        return new User(user.getEmail(), user.getPassword(), Collections.emptyList());
+    }
+}
