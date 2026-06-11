@@ -44,6 +44,11 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong. Please try again.");
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException ex) {
+        return error(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(Map.of(
                 "timestamp", LocalDateTime.now().toString(),
