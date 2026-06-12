@@ -8,6 +8,11 @@ target/
 src/main/resources/application.properties
 src/main/resources/application-*.properties
 
+# uploaded files
+uploads
+uploads/
+uploads/**
+
 ### STS ###
 .apt_generated
 .classpath

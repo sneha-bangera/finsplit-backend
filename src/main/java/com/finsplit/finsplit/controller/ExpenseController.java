@@ -9,6 +9,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -54,5 +56,27 @@ public class ExpenseController {
     public ResponseEntity<ExpenseSummaryResponse> summary(
             @AuthenticationPrincipal UserDetails u) {
         return ResponseEntity.ok(expenseService.getSummary(u.getUsername()));
+    }
+
+    // POST /api/expenses/{id}/receipt — upload a receipt image
+    @PostMapping(value = "/{id}/receipt",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ExpenseResponse> uploadReceipt(
+            @AuthenticationPrincipal UserDetails u,
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(expenseService.uploadReceipt(u.getUsername(), id, file));
+    }
+
+    // GET /api/expenses/{id}/receipt — serve the receipt image
+    @GetMapping("/{id}/receipt")
+    public ResponseEntity<byte[]> getReceipt(
+            @AuthenticationPrincipal UserDetails u,
+            @PathVariable String id) {
+        byte[] image = expenseService.getReceipt(u.getUsername(), id);
+        return ResponseEntity.ok()
+                .header("Content-Type", "image/jpeg")
+                .header("Cache-Control", "max-age=3600")
+                .body(image);
     }
 }

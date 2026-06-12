@@ -46,6 +46,7 @@ public class ExpenseDTOs {
             String date,
             String note,
             CategoryResponse category,
+            String receiptUrl,
             String createdAt
     ) {}
 

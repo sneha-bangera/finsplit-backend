@@ -36,6 +36,9 @@ public class Expense {
     @Column
     private String note;
 
+    @Column(name = "receipt_path")
+    private String receiptPath;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

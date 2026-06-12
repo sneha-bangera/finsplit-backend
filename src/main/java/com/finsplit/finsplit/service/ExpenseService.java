@@ -10,6 +10,7 @@ import com.finsplit.finsplit.repository.ExpenseRepository;
 import com.finsplit.finsplit.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,6 +24,7 @@ public class ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
 
     // ── helpers ──────────────────────────────────────────
 
@@ -32,6 +34,9 @@ public class ExpenseService {
     }
 
     private ExpenseResponse toResponse(Expense e) {
+        String receiptUrl = e.getReceiptPath() != null
+                ? "/api/expenses/" + e.getId() + "/receipt"
+                : null;
         return new ExpenseResponse(
                 e.getId().toString(),
                 e.getAmount(),
@@ -40,6 +45,7 @@ public class ExpenseService {
                 new CategoryResponse(e.getCategory().getId(),
                         e.getCategory().getName(),
                         e.getCategory().getIcon()),
+                receiptUrl,
                 e.getCreatedAt().toString()
         );
     }
@@ -118,6 +124,9 @@ public class ExpenseService {
         if (!expense.getUser().getEmail().equals(email))
             throw new UnauthorizedException("You can only delete your own expenses");
 
+        // Delete receipt file from disk if exists
+        fileStorageService.delete(expense.getReceiptPath());
+
         expenseRepository.delete(expense);
     }
 
@@ -144,5 +153,34 @@ public class ExpenseService {
                 .stream().limit(5).map(this::toResponse).toList();
 
         return new ExpenseSummaryResponse(total, thisMonth.size(), breakdown, recent);
+    }
+
+    public ExpenseResponse uploadReceipt(String email, String expenseId, MultipartFile file) {
+        var expense = expenseRepository.findById(UUID.fromString(expenseId))
+                .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
+
+        if (!expense.getUser().getEmail().equals(email))
+            throw new UnauthorizedException("You can only upload receipts for your own expenses");
+
+        // Delete old receipt if replacing
+        fileStorageService.delete(expense.getReceiptPath());
+
+        String path = fileStorageService.store(file, expense.getUser().getId().toString());
+        expense.setReceiptPath(path);
+
+        return toResponse(expenseRepository.save(expense));
+    }
+
+    public byte[] getReceipt(String email, String expenseId) {
+        var expense = expenseRepository.findById(UUID.fromString(expenseId))
+                .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
+
+        if (!expense.getUser().getEmail().equals(email))
+            throw new UnauthorizedException("Access denied");
+
+        if (expense.getReceiptPath() == null)
+            throw new ResourceNotFoundException("No receipt for this expense");
+
+        return fileStorageService.load(expense.getReceiptPath());
     }
 }
