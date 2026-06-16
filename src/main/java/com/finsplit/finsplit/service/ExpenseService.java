@@ -35,7 +35,7 @@ public class ExpenseService {
 
     private ExpenseResponse toResponse(Expense e) {
         String receiptUrl = e.getReceiptPath() != null
-                ? "/api/expenses/" + e.getId() + "/receipt"
+                ? "/expenses/" + e.getId() + "/receipt"
                 : null;
         return new ExpenseResponse(
                 e.getId().toString(),

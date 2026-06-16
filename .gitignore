@@ -40,3 +40,17 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+# Maven
+*.class
+*.jar
+*.war
+
+# IntelliJ
+.idea/
+.DS_Store
+
+# Logs
+*.log
+logs/
