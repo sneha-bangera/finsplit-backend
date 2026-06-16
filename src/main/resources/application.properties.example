@@ -1,0 +1,32 @@
+# ── Server ───────────────────────────────────────
+server.port=8080
+
+# ── Database ─────────────────────────────────────
+spring.datasource.url=jdbc:postgresql://localhost:5432/finsplit_db
+spring.datasource.username=postgres
+spring.datasource.password=YOUR_POSTGRES_PASSWORD
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.format_sql=false
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# ── JWT ───────────────────────────────────────────
+jwt.secret=YOUR_JWT_SECRET_MIN_32_CHARS
+jwt.expiration-ms=86400000
+
+# ── File Storage ─────────────────────────────────
+app.upload.dir=C:/your/path/to/finsplit-uploads
+
+# ── Mail (uncomment when ready) ──────────────────
+# spring.mail.host=smtp.gmail.com
+# spring.mail.port=587
+# spring.mail.username=yourgmail@gmail.com
+# spring.mail.password=YOUR_GMAIL_APP_PASSWORD
+# spring.mail.properties.mail.smtp.auth=true
+# spring.mail.properties.mail.smtp.starttls.enable=true
+
+# ── Multipart ─────────────────────────────────────
+spring.servlet.multipart.enabled=true
+spring.servlet.multipart.max-file-size=5MB
+spring.servlet.multipart.max-request-size=5MB
