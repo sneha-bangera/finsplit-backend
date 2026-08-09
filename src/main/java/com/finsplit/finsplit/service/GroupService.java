@@ -4,6 +4,8 @@ import com.finsplit.finsplit.dto.GroupDTOs.*;
 import com.finsplit.finsplit.entity.*;
 import com.finsplit.finsplit.exception.ResourceNotFoundException;
 import com.finsplit.finsplit.exception.UnauthorizedException;
+import com.finsplit.finsplit.kafka.ExpenseAddedEvent;
+import com.finsplit.finsplit.kafka.ExpenseEventProducer;
 import com.finsplit.finsplit.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,8 @@ public class GroupService {
     private final GroupExpenseRepository groupExpenseRepository;
     private final ExpenseSplitRepository splitRepository;
     private final UserRepository         userRepository;
+
+    private final ExpenseEventProducer expenseEventProducer;
 
     // ── helpers ──────────────────────────────────────────
 
@@ -138,9 +142,7 @@ public class GroupService {
 
     // ── Group expenses ────────────────────────────────────
 
-    public GroupExpenseResponse addExpense(String email,
-                                           String groupId,
-                                           AddGroupExpenseRequest req) {
+    public GroupExpenseResponse addExpense(String email, String groupId, AddGroupExpenseRequest req) {
         var group  = getGroup(groupId);
         var paidBy = getUser(email);
         assertMember(group, paidBy);
@@ -185,10 +187,32 @@ public class GroupService {
                         .build());
             }
         }
-
         expense.setSplits(splits);
-        return toExpenseResponse(groupExpenseRepository.save(expense));
+        GroupExpense saved = groupExpenseRepository.save(expense);
+
+        // ── Publish Kafka event ───────────────────────────────
+        ExpenseAddedEvent event = ExpenseAddedEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .groupId(group.getId().toString())
+                .groupName(group.getName())
+                .expenseId(saved.getId().toString())
+                .description(saved.getDescription())
+                .amount(saved.getAmount())
+                .splitType(saved.getSplitType())
+                .paidByUserId(paidBy.getId().toString())
+                .paidByName(paidBy.getName())
+                .paidByEmail(paidBy.getEmail())
+                .occurredAt(java.time.LocalDateTime.now())
+                .build();
+
+        expenseEventProducer.publishExpenseAdded(event);
+        // ─────────────────────────────────────────────────────
+
+        return toExpenseResponse(saved);
+
+//        return toExpenseResponse(groupExpenseRepository.save(expense));
     }
+
 
     public List<GroupExpenseResponse> getGroupExpenses(String email, String groupId) {
         var group = getGroup(groupId);
@@ -212,43 +236,6 @@ public class GroupService {
         groupExpenseRepository.delete(expense);
     }
 
-    // ── Balances ──────────────────────────────────────────
-
-//    public GroupBalanceResponse getBalances(String email, String groupId) {
-//        var group = getGroup(groupId);
-//        assertMember(group, getUser(email));
-//
-//        // net[userId] = total paid - total owed
-//        Map<String, BigDecimal> net = new HashMap<>();
-//        Map<String, String>     names = new HashMap<>();
-//
-//        for (User m : group.getMembers()) {
-//            net.put(m.getId().toString(), BigDecimal.ZERO);
-//            names.put(m.getId().toString(), m.getName());
-//        }
-//
-//        for (GroupExpense ge : groupExpenseRepository.findByGroupOrderByDateDesc(group)) {
-//            String payerId = ge.getPaidBy().getId().toString();
-//            // payer gets credit for the full amount
-//            net.merge(payerId, ge.getAmount(), BigDecimal::add);
-//
-//            // each member owes their share
-//            for (ExpenseSplit split : ge.getSplits()) {
-//                if (!split.isSettled()) {
-//                    String uid = split.getUser().getId().toString();
-//                    net.merge(uid, split.getShareAmount().negate(), BigDecimal::add);
-//                }
-//            }
-//        }
-//
-//        List<BalanceEntry> balances = net.entrySet().stream()
-//                .map(e -> new BalanceEntry(e.getKey(), names.get(e.getKey()), e.getValue()))
-//                .toList();
-//
-//        List<SettlementSuggestion> suggestions = computeSettlements(balances, names);
-//
-//        return new GroupBalanceResponse(balances, suggestions);
-//    }
 
     public GroupBalanceResponse getBalances(String email, String groupId) {
         var group = getGroup(groupId);
@@ -352,59 +339,4 @@ public class GroupService {
         splitRepository.save(split);
     }
 
-    // ── Debt simplification algorithm ─────────────────────
-    // Greedy approach: sort creditors and debtors, match largest pairs first
-    // Result: minimum number of transactions to settle all debts
-
-//    private List<SettlementSuggestion> computeSettlements(
-//            List<BalanceEntry> balances, Map<String, String> names) {
-//
-//        // Separate into who owes (negative) and who is owed (positive)
-//        List<BalanceEntry> creditors = balances.stream()
-//                .filter(b -> b.netBalance().compareTo(BigDecimal.ZERO) > 0)
-//                .sorted(Comparator.comparing(BalanceEntry::netBalance).reversed())
-//                .collect(Collectors.toCollection(ArrayList::new));
-//
-//        List<BalanceEntry> debtors = balances.stream()
-//                .filter(b -> b.netBalance().compareTo(BigDecimal.ZERO) < 0)
-//                .sorted(Comparator.comparing(BalanceEntry::netBalance))
-//                .collect(Collectors.toCollection(ArrayList::new));
-//
-//        List<SettlementSuggestion> suggestions = new ArrayList<>();
-//
-//        // Use mutable amounts for the algorithm
-//        Map<String, BigDecimal> creditMap = new HashMap<>();
-//        Map<String, BigDecimal> debtMap   = new HashMap<>();
-//
-//        creditors.forEach(c -> creditMap.put(c.userId(), c.netBalance()));
-//        debtors.forEach(d   -> debtMap.put(d.userId(),
-//                d.netBalance().negate())); // store as positive
-//
-//        List<String> creditorIds = new ArrayList<>(creditMap.keySet());
-//        List<String> debtorIds   = new ArrayList<>(debtMap.keySet());
-//
-//        int ci = 0, di = 0;
-//        while (ci < creditorIds.size() && di < debtorIds.size()) {
-//            String cId  = creditorIds.get(ci);
-//            String dId  = debtorIds.get(di);
-//            BigDecimal credit = creditMap.get(cId);
-//            BigDecimal debt   = debtMap.get(dId);
-//
-//            BigDecimal payment = credit.min(debt);
-//
-//            suggestions.add(new SettlementSuggestion(
-//                    dId, names.get(dId),
-//                    cId, names.get(cId),
-//                    payment.setScale(2, RoundingMode.HALF_UP)
-//            ));
-//
-//            creditMap.put(cId, credit.subtract(payment));
-//            debtMap.put(dId, debt.subtract(payment));
-//
-//            if (creditMap.get(cId).compareTo(BigDecimal.ZERO) == 0) ci++;
-//            if (debtMap.get(dId).compareTo(BigDecimal.ZERO) == 0) di++;
-//        }
-//
-//        return suggestions;
-//    }
 }
