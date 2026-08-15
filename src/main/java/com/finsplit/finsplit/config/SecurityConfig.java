@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/categories").permitAll()
                         .requestMatchers("/api/health").permitAll()
+                        .requestMatchers("/api/kafka-admin/**").permitAll()  
                         .requestMatchers(HttpMethod.GET, "/api/expenses/*/receipt").permitAll()
                         .anyRequest().authenticated()
                 )

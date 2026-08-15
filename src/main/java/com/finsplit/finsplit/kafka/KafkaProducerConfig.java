@@ -48,4 +48,15 @@ public class KafkaProducerConfig {
                 .replicas(1)
                 .build();
     }
+
+    @Value("${app.kafka.topic.expense-added-dlt}")
+    private String expenseAddedDltTopic;
+
+    @Bean
+    public NewTopic expenseAddedDltTopic() {
+        return TopicBuilder.name(expenseAddedDltTopic)
+                .partitions(1)
+                .replicas(1)
+                .build();
+    }
 }
